@@ -11,8 +11,17 @@ export const MOCK_WORDS = {
     analysis: {
       vietnamese_meaning: "sự đáng gờm, sức mạnh đáng nể",
       simple_explanation: "Là cảm giác người khác vừa sợ vừa nể bạn (hoặc một đội, một vật) vì quá mạnh hoặc quá giỏi.",
-      etymology: {
-        breakdown: "formid- (nỗi sợ, từ Latin formido) + -able (có thể) + -ity (hậu tố danh từ)",
+      dictionary_examples: [
+        { en: "Everyone feared the formidability of the champion.", vi: "Ai cũng sợ sự đáng gờm của nhà vô địch." },
+        { en: "The formidability of the mountain stopped many climbers.", vi: "Sự hiểm trở của ngọn núi khiến nhiều người leo núi bỏ cuộc." },
+        { en: "Her formidability in debates is well known.", vi: "Tài tranh luận đáng nể của cô ấy rất nổi tiếng." }
+      ],
+      morphology: {
+        parts: [
+          { segment: "formid", type: "bound_base", meaning: "nỗi sợ (Latin formido), không đứng một mình được" },
+          { segment: "able", type: "suffix", meaning: "có thể, đáng (tạo tính từ formidable)" },
+          { segment: "ity", type: "suffix", meaning: "hậu tố tạo danh từ chỉ tính chất" }
+        ],
         memory_hook: "Formid- = sợ: thứ gì 'đáng sợ' thì có formidability.",
         related_words: ["formidable (adj): đáng gờm", "daunting (adj): làm nản chí", "feeble (adj): yếu ớt (trái nghĩa)"]
       },
