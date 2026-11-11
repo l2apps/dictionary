@@ -149,3 +149,18 @@ dialog label { display: block; font-weight: 700; margin: 10px 0 6px; }
   .search-bar .btn { min-height: 50px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* v2 */
+.usage { background: var(--green-light); color: var(--green-ink); border-radius: 999px; padding: 6px 12px; font-size: .85rem; font-weight: 700; white-space: nowrap; }
+.morph { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 12px; }
+.morph .plus { color: var(--muted); font-weight: 800; }
+.morph-chip { padding: 6px 14px; border-radius: 10px; font-weight: 800; font-size: 1.1rem; border: 2px solid; }
+.t-prefix { background: #E0F2FE; border-color: #7DD3FC; color: #075985; }
+.t-free_base { background: var(--green-light); border-color: var(--green); color: var(--green-ink); }
+.t-bound_base { background: #FEF3C7; border-color: var(--gold); color: #92400E; }
+.t-suffix { background: #FCE7F3; border-color: #F9A8D4; color: #9D174D; }
+.t-inflectional_suffix { background: #EDE9FE; border-color: #C4B5FD; color: #5B21B6; }
+.word-card { position: relative; }
+.word-card h3 { padding-right: 44px; }
+.word-card .del { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; font-size: 1rem; }
+@media (max-width: 640px) { .usage { margin-left: auto; font-size: .75rem; padding: 4px 8px; } }
