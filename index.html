@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Dict – Học từ vựng</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <h1 class="logo">DICT</h1>
+      <nav class="tabs" aria-label="Điều hướng chính">
+        <button class="tab is-active" data-tab="lookup">🔍 Tra từ</button>
+        <button class="tab" data-tab="notebook">
+          📓 Sổ tay <span id="notebook-count" class="count">0</span>
+        </button>
+      </nav>
+      <button
+        id="settings-btn"
+        class="btn btn-ghost"
+        aria-label="Cài đặt API Key"
+      >
+        ⚙️ <span class="hide-sm">Cài đặt API Key</span>
+      </button>
+    </header>
+
+    <main class="app-main">
+      <section id="tab-lookup" class="tab-panel">
+        <form id="lookup-form" class="search-bar" autocomplete="off">
+          <input
+            id="lookup-input"
+            type="text"
+            placeholder="Nhập một từ tiếng Anh, ví dụ: benevolent"
+            aria-label="Từ cần tra"
+            required
+          />
+          <button class="btn btn-primary" type="submit">Tra từ</button>
+        </form>
+        <div id="lookup-view" aria-live="polite">
+          <p class="empty">
+            Nhập một từ để xem gốc từ, cách dùng và bắt đầu đặt câu.
+          </p>
+        </div>
+      </section>
+
+      <section id="tab-notebook" class="tab-panel" hidden>
+        <div id="notebook-list-wrap">
+          <div class="search-bar">
+            <input
+              id="nb-search"
+              type="search"
+              placeholder="Tìm trong sổ tay…"
+              aria-label="Tìm trong sổ tay"
+            />
+          </div>
+          <div class="filters" id="nb-filters">
+            <button class="chip is-active" data-filter="all">Tất cả</button>
+            <button class="chip" data-filter="zero">Chưa đặt câu (0/7)</button>
+            <button class="chip" data-filter="progress">
+              Đang luyện (1-6/7)
+            </button>
+            <button class="chip" data-filter="done">Đã thuộc (7/7)</button>
+          </div>
+          <div id="nb-list" class="card-list"></div>
+        </div>
+        <div id="notebook-view" hidden></div>
+      </section>
+    </main>
+
+    <dialog id="settings-dialog">
+      <form method="dialog" id="settings-form">
+        <h2>Cài đặt API Key</h2>
+        <p class="muted">
+          Key Groq chỉ lưu trong trình duyệt của bạn (localStorage).
+        </p>
+        <label for="api-key-input">GROQ_API_KEY</label>
+        <input
+          id="api-key-input"
+          type="password"
+          placeholder="gsk_..."
+          autocomplete="off"
+        />
+        <div class="dialog-actions">
+          <button class="btn btn-ghost" value="cancel">Huỷ</button>
+          <button class="btn btn-primary" id="save-key" value="default">
+            Lưu
+          </button>
+        </div>
+      </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
