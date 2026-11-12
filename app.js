@@ -122,17 +122,15 @@ function speak(entry) {
 }
 
 /* ---------- Render: UnifiedWordView ---------- */
-const levelOf = (n) => (n < 2 ? 1 : n < 4 ? 2 : 3);
-const LEVEL_LABEL = { 1: "Mức 1 – Dễ", 2: "Mức 2 – Vừa", 3: "Mức 3 – Khó" };
-const MORPH = { prefix: "Tiền tố (prefix)", free_base: "Gốc tự do (free base)", bound_base: "Gốc buộc (bound base)", suffix: "Hậu tố phái sinh (suffix)", inflectional_suffix: "Hậu tố biến tố (inflection)" };
+const MORPH = { prefix: "prefix", free_base: "free base", bound_base: "bound base", suffix: "suffix", inflectional_suffix: "inflection" };
 
 function morphologyHTML(a) {
   const m = a.morphology || {}, parts = m.parts || [];
   const rel = m.related_words || a.etymology?.related_words || [];
   const hook = m.memory_hook || a.etymology?.memory_hook;
   const body = parts.length
-    ? `<div class="morph">${parts.map((p) => `<span class="morph-chip t-${esc(p.type)}">${esc(p.segment)}</span>`).join('<span class="plus">+</span>')}</div>
-       <ul class="list">${parts.map((p) => `<li><b>${esc(p.segment)}</b> – <em>${MORPH[p.type] || esc(p.type)}</em>: ${esc(p.meaning)}</li>`).join("")}</ul>`
+    ? `<div class="morph">${parts.map((p) => `<span class="morph-part"><span class="morph-chip t-${esc(p.type)}">${esc(p.segment)}</span><span class="morph-type">${MORPH[p.type] || esc(p.type)}</span></span>`).join('<span class="plus">+</span>')}</div>
+       <ul class="list">${parts.map((p) => `<li><b>${esc(p.segment)}</b>: ${esc(p.meaning)}</li>`).join("")}</ul>`
     : `<p><b>Cấu tạo:</b> ${esc(a.etymology?.breakdown)}</p>`;
   return `<section class="card"><h3>Cấu tạo từ (hình thái học)</h3>${body}${hook ? `<div class="hook">🧠 ${esc(hook)}</div>` : ""}<ul class="list">${rel.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></section>`;
 }
@@ -191,9 +189,7 @@ function wordViewHTML(v) {
   const challenge = n >= MAX_EX ? "" : `
     <section class="card">
       <h3>Thử thách đặt câu mới</h3>
-      <span class="badge badge-gold">${LEVEL_LABEL[levelOf(n)]}</span>
-      <div class="prompt-box" style="margin-top:8px">🎯 ${esc(e.context_prompt || "Hãy đặt một câu với từ này.")}</div>
-      ${levelOf(n) === 1 && e.frame ? `<div class="hint"><b>🧩 Khung câu:</b> ${esc(e.frame)}</div>` : ""}
+      <div class="prompt-box">🎯 ${esc(e.context_prompt || "Hãy đặt một câu với từ này.")}</div>
       ${hintsHTML(v)}
       <textarea id="draft" placeholder="Viết câu tiếng Anh của bạn với “${esc(e.word)}”…" aria-label="Câu của bạn">${esc(v.draft)}</textarea>
       <div class="actions">
@@ -267,12 +263,12 @@ async function lookupWord(raw) {
   if (store[k]) { views.lookup = mk(store[k]); return render("lookup"); }
   $("#lookup-view").innerHTML = `<p class="empty"><span class="spinner"></span>Đang phân tích “${esc(word)}”…</p>`;
   try {
-    const [mm, ai] = await Promise.all([fetchMyMemory(word), callGroq(WORD_ANALYSIS_PROMPT, { word, difficulty_level: 1 })]);
+    const [mm, ai] = await Promise.all([fetchMyMemory(word), callGroq(WORD_ANALYSIS_PROMPT, word)]);
     const entry = {
       word: ai.word || word, pos: ai.part_of_speech || "", ipa: ai.ipa || "", audio: "",
       definition_en: ai.english_definition || "", cefr: ai.cefr_level, saved: false,
       analysis: ai, mm_translations: mm.translations, mm_examples: mm.examples,
-      context_prompt: ai.initial_context_prompt, frame: ai.initial_sentence_frame || "", examples: []
+      context_prompt: ai.initial_context_prompt, examples: []
     };
     views.lookup = mk(entry);
     render("lookup");
@@ -312,16 +308,15 @@ async function handleAction(key, action, target) {
       if (v.hintLevel >= 3) return toast("Bạn đã xem hết 3 tầng gợi ý.");
       if (!v.hints) {
         v.busy = "hint"; render(key);
-        v.hints = await callGroq(HINTS_GENERATION_PROMPT, { target_word: e.word, difficulty_level: levelOf(e.examples.length), current_context: e.context_prompt, note: "Hints must fit the current_context. Ignore new_context_prompt." });
+        v.hints = await callGroq(HINTS_GENERATION_PROMPT, { target_word: e.word, current_context: e.context_prompt, note: "Hints must fit the current_context. Ignore new_context_prompt." });
         v.busy = "";
       }
       v.hintLevel++; return render(key);
     }
     if (action === "newctx") {
       v.busy = "newctx"; render(key);
-      const h = await callGroq(HINTS_GENERATION_PROMPT, { target_word: e.word, difficulty_level: levelOf(e.examples.length), current_context: e.context_prompt, note: "The user wants a different context: make new_context_prompt fresh and make all 3 hints fit that new_context_prompt." });
+      const h = await callGroq(HINTS_GENERATION_PROMPT, { target_word: e.word, current_context: e.context_prompt, note: "The user wants a different context: make new_context_prompt fresh and make all 3 hints fit that new_context_prompt." });
       e.context_prompt = h.new_context_prompt || e.context_prompt;
-      e.frame = h.hint_level_2_frame || "";
       v.hints = h; v.hintLevel = 0; v.lastEval = null; v.busy = "";
       if (e.saved) persist();
       return render(key);
@@ -330,7 +325,7 @@ async function handleAction(key, action, target) {
       const sentence = v.draft.trim();
       if (sentence.split(/\s+/).length < 3) return toast("Hãy viết một câu đầy đủ trước khi chấm.", true);
       v.busy = "grade"; render(key);
-      const ev = await callGroq(SENTENCE_EVALUATION_PROMPT, { target_word: e.word, context: e.context_prompt, user_sentence: sentence, difficulty_level: levelOf(e.examples.length), next_difficulty_level: levelOf(e.examples.length + 1) });
+      const ev = await callGroq(SENTENCE_EVALUATION_PROMPT, { target_word: e.word, context: e.context_prompt, user_sentence: sentence });
       v.busy = ""; v.lastEval = ev;
       if (ev.is_valid) {
         e.examples.push({
@@ -339,7 +334,6 @@ async function handleAction(key, action, target) {
           corrected_sentence: ev.corrected_sentence, c1_upgrade_sentence: ev.c1_upgrade_sentence
         });
         if (ev.next_context_prompt) e.context_prompt = ev.next_context_prompt;
-        e.frame = ev.next_sentence_frame || "";
         v.draft = ""; v.hints = null; v.hintLevel = 0;
         if (!e.saved) { setSaved(e, true); toast("⭐ Đã tự động lưu từ vào Sổ tay!"); }
         else { persist(); renderList(); }
