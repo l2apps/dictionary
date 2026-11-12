@@ -164,3 +164,8 @@ dialog label { display: block; font-weight: 700; margin: 10px 0 6px; }
 .word-card h3 { padding-right: 44px; }
 .word-card .del { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; font-size: 1rem; }
 @media (max-width: 640px) { .usage { margin-left: auto; font-size: .75rem; padding: 4px 8px; } }
+
+.morph { align-items: flex-start; }
+.morph-part { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.morph-type { font-size: .8rem; font-weight: 700; color: var(--muted); }
+.morph .plus { padding-top: 10px; }
