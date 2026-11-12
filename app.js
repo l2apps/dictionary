@@ -25,6 +25,24 @@ function persist() {
 const keyOf = (w) => w.trim().toLowerCase();
 const esc = (s = "") => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
+/* ---------- Cache: từ đã tra (chưa lưu sổ tay) ---------- */
+const CACHE_KEY = "vocab_cache_v1", CACHE_MAX = 300;
+let cache = (() => { try { return JSON.parse(localStorage.getItem(CACHE_KEY)) || {}; } catch { return {}; } })();
+function saveCache() {
+  for (let i = 0; i < 3; i++) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(cache)); return; }
+    catch { const keys = Object.keys(cache); keys.slice(0, Math.ceil(keys.length / 2)).forEach((k) => delete cache[k]); }
+  }
+}
+function cachePut(entry) {
+  const k = keyOf(entry.word);
+  delete cache[k];
+  cache[k] = { ...entry, saved: false, examples: [] };
+  const keys = Object.keys(cache);
+  keys.slice(0, Math.max(0, keys.length - CACHE_MAX)).forEach((x) => delete cache[x]);
+  saveCache();
+}
+
 /* ---------- UI helpers ---------- */
 let toastTimer;
 function toast(msg, isError = false) {
@@ -261,6 +279,7 @@ async function lookupWord(raw) {
   if (!/^[A-Za-z][A-Za-z'-]*$/.test(word)) return toast("Hãy nhập một từ tiếng Anh hợp lệ.", true);
   const k = keyOf(word);
   if (store[k]) { views.lookup = mk(store[k]); return render("lookup"); }
+  if (cache[k]) { views.lookup = mk(structuredClone(cache[k])); return render("lookup"); }
   $("#lookup-view").innerHTML = `<p class="empty"><span class="spinner"></span>Đang phân tích “${esc(word)}”…</p>`;
   try {
     const [mm, ai] = await Promise.all([fetchMyMemory(word), callGroq(WORD_ANALYSIS_PROMPT, word)]);
@@ -271,6 +290,7 @@ async function lookupWord(raw) {
       context_prompt: ai.initial_context_prompt, examples: []
     };
     views.lookup = mk(entry);
+    cachePut(entry);
     render("lookup");
   } catch (err) {
     $("#lookup-view").innerHTML = `<p class="empty">Không tra được từ này. ${esc(err.message)}</p>`;
@@ -280,7 +300,8 @@ async function lookupWord(raw) {
 
 function setSaved(entry, saved) {
   entry.saved = saved;
-  if (saved) store[keyOf(entry.word)] = entry; else delete store[keyOf(entry.word)];
+  if (saved) { store[keyOf(entry.word)] = entry; delete cache[keyOf(entry.word)]; saveCache(); }
+  else { delete store[keyOf(entry.word)]; cachePut(entry); }
   persist(); renderList();
 }
 
