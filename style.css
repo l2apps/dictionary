@@ -169,3 +169,22 @@ dialog label { display: block; font-weight: 700; margin: 10px 0 6px; }
 .morph-part { display: flex; flex-direction: column; align-items: center; gap: 4px; }
 .morph-type { font-size: .8rem; font-weight: 700; color: var(--muted); }
 .morph .plus { padding-top: 10px; }
+
+/* v3 */
+.is-basic .only-ai { display: none; }
+.only-basic { display: none; }
+.is-basic .only-basic { display: block; }
+.search-wrap { position: relative; margin-bottom: 16px; }
+.search-wrap .search-bar { margin-bottom: 0; }
+.history { position: absolute; z-index: 15; left: 0; right: 0; top: calc(100% + 4px); background: var(--bg); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.08); padding: 6px; }
+.hist-row { display: flex; align-items: center; }
+.hist-item { flex: 1; text-align: left; border: 0; background: none; padding: 10px 12px; min-height: 44px; border-radius: 8px; cursor: pointer; font-weight: 700; }
+.hist-item:hover, .hist-x:hover { background: var(--green-light); }
+.hist-x { border: 0; background: none; min-width: 44px; min-height: 44px; border-radius: 8px; cursor: pointer; color: var(--muted); }
+.hist-clear { width: 100%; border: 0; background: none; padding: 10px; color: var(--muted); cursor: pointer; }
+#nb-sort { border: 2px solid var(--border); border-radius: 12px; padding: 0 10px; background: var(--bg); min-height: 44px; font-size: 16px; }
+.review-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 20px; text-align: center; max-width: 640px; margin: 0 auto; }
+.review-sentence { font-size: 1.3rem; font-weight: 800; margin: 12px 0; }
+.review-actions { display: flex; gap: 10px; margin-top: 18px; }
+.review-actions .btn { flex: 1; }
+dialog hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0 4px; }
