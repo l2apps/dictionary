@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Dict – Học từ vựng</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#16A34A">
 </head>
 <body>
   <header class="app-header">
@@ -12,6 +14,7 @@
     <nav class="tabs" aria-label="Điều hướng chính">
       <button class="tab is-active" data-tab="lookup">🔍 Tra từ</button>
       <button class="tab" data-tab="notebook">📓 Sổ tay <span id="notebook-count" class="count">0</span></button>
+      <button class="tab" data-tab="review">🃏 Ôn tập <span id="review-count" class="count">0</span></button>
     </nav>
     <span id="usage" class="usage" role="status">⚡ Lượt sử dụng: 0</span>
     <button id="settings-btn" class="btn btn-ghost" aria-label="Cài đặt API Key">⚙️ <span class="hide-sm">Cài đặt API Key</span></button>
@@ -19,10 +22,13 @@
 
   <main class="app-main">
     <section id="tab-lookup" class="tab-panel">
-      <form id="lookup-form" class="search-bar" autocomplete="off">
+      <div class="search-wrap">
+        <form id="lookup-form" class="search-bar" autocomplete="off">
         <input id="lookup-input" type="text" placeholder="Nhập một từ tiếng Anh, ví dụ: benevolent" aria-label="Từ cần tra" required>
         <button class="btn btn-primary" type="submit">Tra từ</button>
       </form>
+        <div id="history" class="history" hidden></div>
+      </div>
       <div id="lookup-view" aria-live="polite">
         <p class="empty">Nhập một từ để xem gốc từ, cách dùng và bắt đầu đặt câu.</p>
       </div>
@@ -32,6 +38,7 @@
       <div id="notebook-list-wrap">
         <div class="search-bar">
           <input id="nb-search" type="search" placeholder="Tìm trong sổ tay…" aria-label="Tìm trong sổ tay">
+          <select id="nb-sort" aria-label="Sắp xếp"><option value="new">Mới nhất</option><option value="az">A–Z</option><option value="low">Điểm thấp nhất</option><option value="few">Ít câu nhất</option></select>
         </div>
         <div class="filters" id="nb-filters">
           <button class="chip is-active" data-filter="all">Tất cả</button>
@@ -43,6 +50,7 @@
       </div>
       <div id="notebook-view" hidden></div>
     </section>
+    <section id="tab-review" class="tab-panel" hidden><div id="review-view"></div></section>
   </main>
 
   <dialog id="settings-dialog">
@@ -51,6 +59,13 @@
       <p class="muted">Key Groq chỉ lưu trong trình duyệt của bạn (localStorage).</p>
       <label for="api-key-input">GROQ_API_KEY</label>
       <input id="api-key-input" type="password" placeholder="gsk_..." autocomplete="off">
+      <hr>
+      <label>Sao lưu Sổ tay</label>
+      <div class="actions">
+        <button type="button" class="btn btn-ghost" id="export-btn">⬇️ Xuất file</button>
+        <button type="button" class="btn btn-ghost" id="import-btn">⬆️ Nhập file</button>
+      </div>
+      <input type="file" id="import-file" accept=".json,application/json" hidden>
       <div class="dialog-actions">
         <button class="btn btn-ghost" value="cancel">Huỷ</button>
         <button class="btn btn-primary" id="save-key" value="default">Lưu</button>
