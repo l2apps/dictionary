@@ -76,6 +76,40 @@ async function fetchMyMemory(word) {
   return out;
 }
 
+async function fetchWiktionary(word) {
+  const out = { found: null, pos: "", definition_en: "", examples: [] };
+  try {
+    const res = await fetch(`https://en.wiktionary.org/api/rest_v1/page/definition/${encodeURIComponent(word.toLowerCase())}`);
+    if (res.status === 404) { out.found = false; return out; }
+    if (!res.ok) return out;
+    const en = (await res.json()).en;
+    if (!en?.length) { out.found = false; return out; }
+    out.found = true;
+    const strip = (h) => new DOMParser().parseFromString(h || "", "text/html").body.textContent.trim();
+    out.pos = (en[0].partOfSpeech || "").toLowerCase();
+    out.definition_en = strip(en[0].definitions?.[0]?.definition);
+    for (const sec of en) for (const d of sec.definitions || [])
+      for (const ex of d.parsedExamples || d.examples || []) {
+        const t = strip(typeof ex === "string" ? ex : ex.example);
+        if (t && out.examples.length < 3) out.examples.push({ en: t, vi: "" });
+      }
+  } catch (e) { console.warn("Wiktionary lỗi:", e); }
+  return out;
+}
+
+/* ---------- Lịch sử tra từ ---------- */
+const HIST_KEY = "vocab_history_v1";
+let history = (() => { try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch { return []; } })();
+function saveHistory() { try { localStorage.setItem(HIST_KEY, JSON.stringify(history)); } catch {} }
+function addHistory(w) { history = [w, ...history.filter((x) => keyOf(x) !== keyOf(w))].slice(0, 30); saveHistory(); }
+function renderHistory() {
+  const box = $("#history"), q = $("#lookup-input").value.trim().toLowerCase();
+  const items = history.filter((w) => w.toLowerCase().startsWith(q)).slice(0, 8);
+  if (!items.length) { box.hidden = true; return; }
+  box.innerHTML = items.map((w) => `<div class="hist-row"><button type="button" class="hist-item" data-w="${esc(w)}">🕘 ${esc(w)}</button><button type="button" class="hist-x" data-x="${esc(w)}" aria-label="Xoá ${esc(w)}">✕</button></div>`).join("") + `<button type="button" class="hist-clear" data-clear>Xoá lịch sử</button>`;
+  box.hidden = false;
+}
+
 /* ---------- Usage counter (lượt sử dụng Groq) ---------- */
 const USAGE_KEY = "groq_usage_v1";
 const today = () => new Date().toLocaleDateString("sv");
@@ -108,6 +142,7 @@ async function callGroq(systemPrompt, payload) {
       model: "openai/gpt-oss-120b",
       response_format: { type: "json_object" },
       temperature: 0.4,
+      reasoning_effort: "low",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: typeof payload === "string" ? payload : JSON.stringify(payload) }
@@ -150,7 +185,7 @@ function morphologyHTML(a) {
     ? `<div class="morph">${parts.map((p) => `<span class="morph-part"><span class="morph-chip t-${esc(p.type)}">${esc(p.segment)}</span><span class="morph-type">${MORPH[p.type] || esc(p.type)}</span></span>`).join('<span class="plus">+</span>')}</div>
        <ul class="list">${parts.map((p) => `<li><b>${esc(p.segment)}</b>: ${esc(p.meaning)}</li>`).join("")}</ul>`
     : `<p><b>Cấu tạo:</b> ${esc(a.etymology?.breakdown)}</p>`;
-  return `<section class="card"><h3>Cấu tạo từ (hình thái học)</h3>${body}${hook ? `<div class="hook">🧠 ${esc(hook)}</div>` : ""}<ul class="list">${rel.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></section>`;
+  return `<section class="card only-ai"><h3>Cấu tạo từ (hình thái học)</h3>${body}${hook ? `<div class="hook">🧠 ${esc(hook)}</div>` : ""}<ul class="list">${rel.map((w) => `<li>${esc(w)}</li>`).join("")}</ul></section>`;
 }
 
 function dictExamplesHTML(e) {
@@ -205,7 +240,7 @@ function wordViewHTML(v) {
   const dis = v.busy ? "disabled" : "";
 
   const challenge = n >= MAX_EX ? "" : `
-    <section class="card">
+    <section class="card only-ai">
       <h3>Thử thách đặt câu mới</h3>
       <div class="prompt-box">🎯 ${esc(e.context_prompt || "Hãy đặt một câu với từ này.")}</div>
       ${hintsHTML(v)}
@@ -218,7 +253,7 @@ function wordViewHTML(v) {
       <div style="margin-top:14px">${evalHTML(v.lastEval)}</div>
     </section>`;
 
-  return `<div class="wv-grid">
+  return `<div class="wv-grid${e.basic ? " is-basic" : ""}">
     <section class="card wv-head-card">
       <div class="wv-head">
         <div>
@@ -244,7 +279,7 @@ function wordViewHTML(v) {
       </section>
       ${morphologyHTML(a)}
       ${dictExamplesHTML(e)}
-      <section class="card">
+      <section class="card only-ai">
         <h3>Cụm từ cố định</h3>
         <ul class="list">${(a.collocations || []).map((c) => `<li><b>${esc(c.phrase)}</b> – ${esc(c.meaning)}</li>`).join("")}</ul>
         <h3 style="margin-top:14px">Phân biệt sắc thái</h3>
@@ -253,12 +288,13 @@ function wordViewHTML(v) {
     </div>
 
     <div>
-      <section class="card">
+      <section class="card only-ai">
         <h3>Ví dụ của bạn: ${n}/${MAX_EX}</h3>
         <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="${MAX_EX}" aria-valuenow="${n}"><span style="width:${pct}%"></span></div>
         ${n >= MAX_EX ? `<div class="mastered">🏆 Đã làm chủ từ vựng (Mastered)</div>` : ""}
         ${n ? e.examples.map(exampleHTML).join("") : `<p class="muted">Chưa có câu nào. Hãy đặt câu đầu tiên bên dưới.</p>`}
       </section>
+      <section class="card only-basic"><h3>🔑 Chế độ cơ bản</h3><p>Bạn chưa nhập Groq API Key nên chỉ xem được nghĩa, định nghĩa và ví dụ. Nhập key để mở phân tích gốc từ, bối cảnh và bài tập đặt câu.</p><button class="btn btn-primary" data-action="settings">⚙️ Nhập API Key</button></section>
       ${challenge}
     </div>
   </div>`;
@@ -274,26 +310,46 @@ function render(key) {
 }
 
 /* ---------- Actions ---------- */
+const hasKey = () => !!localStorage.getItem(API_KEY);
 async function lookupWord(raw) {
   const word = raw.trim();
   if (!/^[A-Za-z][A-Za-z'-]*$/.test(word)) return toast("Hãy nhập một từ tiếng Anh hợp lệ.", true);
-  const k = keyOf(word);
-  if (store[k]) { views.lookup = mk(store[k]); return render("lookup"); }
-  if (cache[k]) { views.lookup = mk(structuredClone(cache[k])); return render("lookup"); }
-  $("#lookup-view").innerHTML = `<p class="empty"><span class="spinner"></span>Đang phân tích “${esc(word)}”…</p>`;
+  const k = keyOf(word), full = hasKey();
+  $("#history").hidden = true;
+  addHistory(word);
+  const hit = store[k] || cache[k];
+  if (hit && !(hit.basic && full)) {
+    views.lookup = mk(store[k] || structuredClone(hit)); return render("lookup");
+  }
+  const msg = (t) => ($("#lookup-view").innerHTML = `<p class="empty">${t}</p>`);
+  msg(`<span class="spinner"></span>Đang tra “${esc(word)}”…`);
   try {
-    const [mm, ai] = await Promise.all([fetchMyMemory(word), callGroq(WORD_ANALYSIS_PROMPT, word)]);
-    const entry = {
-      word: ai.word || word, pos: ai.part_of_speech || "", ipa: ai.ipa || "", audio: "",
-      definition_en: ai.english_definition || "", cefr: ai.cefr_level, saved: false,
-      analysis: ai, mm_translations: mm.translations, mm_examples: mm.examples,
-      context_prompt: ai.initial_context_prompt, examples: []
-    };
+    const [mm, wk] = await Promise.all([fetchMyMemory(word), fetchWiktionary(word)]);
+    let entry;
+    if (full) {
+      if (wk.found === false && !confirm(`Không thấy “${word}” trong từ điển (có thể sai chính tả). Vẫn phân tích bằng AI?`)) return msg("Đã huỷ. Kiểm tra lại chính tả rồi tra lại nhé.");
+      const ai = await callGroq(WORD_ANALYSIS_PROMPT, word);
+      entry = {
+        word: ai.word || word, pos: ai.part_of_speech || wk.pos, ipa: ai.ipa || "", audio: "",
+        definition_en: ai.english_definition || wk.definition_en, cefr: ai.cefr_level, saved: false,
+        analysis: ai, mm_translations: mm.translations, mm_examples: mm.examples,
+        context_prompt: ai.initial_context_prompt, examples: []
+      };
+    } else {
+      if (wk.found === false) return msg(`Không tìm thấy “${esc(word)}” trong từ điển. Kiểm tra lại chính tả nhé.`);
+      if (wk.found === null && !mm.translations.length) return msg("Không tra được lúc này. Kiểm tra mạng rồi thử lại.");
+      entry = {
+        word, pos: wk.pos, ipa: "", audio: "", definition_en: wk.definition_en, cefr: "", saved: false, basic: true,
+        analysis: { vietnamese_meaning: mm.translations[0] || "", dictionary_examples: wk.examples },
+        mm_translations: mm.translations.slice(1), mm_examples: mm.examples, examples: []
+      };
+    }
+    if (store[k]) { entry.saved = true; entry.examples = store[k].examples; entry.srs = store[k].srs; store[k] = entry; persist(); renderList(); }
+    else cachePut(entry);
     views.lookup = mk(entry);
-    cachePut(entry);
     render("lookup");
   } catch (err) {
-    $("#lookup-view").innerHTML = `<p class="empty">Không tra được từ này. ${esc(err.message)}</p>`;
+    msg(`Không tra được từ này. ${esc(err.message)}`);
     toast(err.message, true);
   }
 }
@@ -310,6 +366,7 @@ async function handleAction(key, action, target) {
   const e = v.entry;
   try {
     if (action === "speak") return speak(e);
+    if (action === "settings") return openSettings();
     if (action === "back") { views.notebook = null; showNotebookList(); return; }
     if (action === "delword") {
       if (!confirm(`Xoá “${e.word}” khỏi Sổ tay?`)) return;
@@ -367,8 +424,10 @@ async function handleAction(key, action, target) {
 }
 
 /* ---------- Notebook list ---------- */
+const avg = (w) => (w.examples.length ? w.examples.reduce((a, x) => a + x.score, 0) / w.examples.length : 99);
 let filter = "all";
 function renderList() {
+  $("#review-count").textContent = dueWords().length;
   $("#notebook-count").textContent = Object.keys(store).length;
   const q = $("#nb-search").value.trim().toLowerCase();
   const items = Object.values(store).filter((w) => {
@@ -377,6 +436,9 @@ function renderList() {
     const okQ = !q || w.word.toLowerCase().includes(q) || (w.analysis?.vietnamese_meaning || "").toLowerCase().includes(q);
     return okF && okQ;
   });
+  const sort = $("#nb-sort").value;
+  items.sort(sort === "az" ? (a, b) => a.word.localeCompare(b.word) : sort === "low" ? (a, b) => avg(a) - avg(b) : sort === "few" ? (a, b) => a.examples.length - b.examples.length : () => 0);
+  if (sort === "new") items.reverse();
   $("#nb-list").innerHTML = items.length ? items.map((w) => {
     const n = w.examples.length;
     return `<div class="word-card" data-word="${esc(keyOf(w.word))}" role="button" tabindex="0">
@@ -384,11 +446,46 @@ function renderList() {
       <h3>${esc(w.word)}</h3>
       <div class="muted">${esc(w.ipa)}</div>
       <p>${esc(w.analysis?.vietnamese_meaning)}</p>
-      <div class="stars">${"⭐".repeat(n)}${"☆".repeat(MAX_EX - n)} (${n}/${MAX_EX})</div>
+      <div class="stars">${"⭐".repeat(n)}${"☆".repeat(MAX_EX - n)} (${n}/${MAX_EX})${n ? ` · Điểm TB ${avg(w).toFixed(1)}` : ""}</div>
     </div>`;
   }).join("") : `<p class="empty" style="grid-column:1/-1">Chưa có từ nào phù hợp. Hãy tra từ mới và bấm ⭐ để lưu.</p>`;
 }
 function showNotebookList() { $("#notebook-view").hidden = true; $("#notebook-list-wrap").hidden = false; renderList(); }
+
+/* ---------- Ôn tập (lặp lại ngắt quãng, 0 token) ---------- */
+const SRS_DAYS = [1, 3, 7, 14, 30];
+const dueWords = () => Object.values(store).filter((w) => !w.srs || w.srs.due <= Date.now());
+let rv = { queue: [], flipped: false, ex: null };
+function pick() {
+  const w = rv.queue[0];
+  rv.flipped = false;
+  rv.ex = w && w.examples.length ? w.examples[Math.floor(Math.random() * w.examples.length)] : null;
+}
+function startReview() { rv.queue = dueWords().sort(() => Math.random() - 0.5); pick(); renderReview(); }
+function renderReview() {
+  const box = $("#review-view"), w = rv.queue[0];
+  if (!w) { box.innerHTML = `<p class="empty">🎉 Không còn từ nào cần ôn lúc này. Quay lại sau nhé!</p>`; return; }
+  const meaning = w.analysis?.vietnamese_meaning || "";
+  const stem = w.word.slice(0, Math.max(3, w.word.length - 3));
+  const blank = rv.ex ? rv.ex.text.replace(new RegExp("\\b" + stem + "\\w*", "ig"), "______") : "";
+  const front = rv.ex
+    ? `<p class="muted">Điền từ còn thiếu (nghĩa: ${esc(meaning)})</p><p class="review-sentence">“${esc(blank)}”</p>`
+    : `<p class="muted">Từ tiếng Anh nào có nghĩa là…</p><p class="review-sentence">${esc(meaning)}</p>`;
+  const back = `<p class="review-sentence">${esc(w.word)} <button class="icon-btn" data-r="speak" aria-label="Phát âm">🔊</button></p>
+    <p class="muted">${esc(w.ipa)} ${esc(w.pos)}</p><p><b>${esc(meaning)}</b></p>${rv.ex ? `<p>“${esc(rv.ex.text)}”</p>` : ""}`;
+  box.innerHTML = `<div class="review-card"><p class="muted">Còn ${rv.queue.length} từ cần ôn</p>${rv.flipped ? back : front}
+    ${rv.flipped
+      ? `<div class="review-actions"><button class="btn btn-ghost" data-r="0">😵 Quên</button><button class="btn btn-ghost" data-r="1">🤔 Khó</button><button class="btn btn-primary" data-r="2">😄 Nhớ</button></div>`
+      : `<div class="review-actions"><button class="btn btn-primary" data-r="flip">Xem đáp án</button></div>`}</div>`;
+}
+function rate(q) {
+  const w = rv.queue.shift(), step = w.srs?.step ?? 0;
+  const ns = q === 0 ? 0 : q === 1 ? step : Math.min(step + 1, SRS_DAYS.length - 1);
+  w.srs = { step: ns, due: Date.now() + (q === 0 ? 10 * 60e3 : SRS_DAYS[ns] * 864e5) };
+  persist(); renderList();
+  if (q === 0) rv.queue.push(w);
+  pick(); renderReview();
+}
 
 /* ---------- Settings ---------- */
 function openSettings() { $("#api-key-input").value = localStorage.getItem(API_KEY) || ""; $("#settings-dialog").showModal(); }
@@ -399,6 +496,8 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
   $("#tab-lookup").hidden = b.dataset.tab !== "lookup";
   $("#tab-notebook").hidden = b.dataset.tab !== "notebook";
   if (b.dataset.tab === "notebook") { if (!views.notebook) showNotebookList(); }
+  $("#tab-review").hidden = b.dataset.tab !== "review";
+  if (b.dataset.tab === "review") startReview();
 }));
 
 $("#lookup-form").addEventListener("submit", (ev) => { ev.preventDefault(); lookupWord($("#lookup-input").value); });
@@ -432,6 +531,42 @@ for (const key of ["lookup", "notebook"]) {
   });
   box.addEventListener("input", (ev) => { if (ev.target.id === "draft" && views[key]) views[key].draft = ev.target.value; });
 }
+
+$("#lookup-input").addEventListener("focus", renderHistory);
+$("#lookup-input").addEventListener("input", renderHistory);
+document.addEventListener("click", (ev) => { if (!ev.target.closest(".search-wrap")) $("#history").hidden = true; });
+$("#history").addEventListener("click", (ev) => {
+  const t = ev.target.closest("button"); if (!t) return;
+  if (t.dataset.w) { $("#lookup-input").value = t.dataset.w; lookupWord(t.dataset.w); }
+  else if (t.dataset.x) { history = history.filter((w) => w !== t.dataset.x); saveHistory(); renderHistory(); }
+  else if ("clear" in t.dataset) { history = []; saveHistory(); renderHistory(); }
+});
+$("#nb-sort").addEventListener("change", renderList);
+$("#review-view").addEventListener("click", (ev) => {
+  const t = ev.target.closest("[data-r]"); if (!t) return;
+  const a = t.dataset.r;
+  if (a === "flip") { rv.flipped = true; renderReview(); }
+  else if (a === "speak") speak(rv.queue[0]);
+  else rate(Number(a));
+});
+$("#export-btn").addEventListener("click", () => {
+  const blob = new Blob([JSON.stringify({ app: "dict", version: 1, store, history }, null, 1)], { type: "application/json" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `dict-backup-${today()}.json` });
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$("#import-btn").addEventListener("click", () => $("#import-file").click());
+$("#import-file").addEventListener("change", async (ev) => {
+  const f = ev.target.files[0]; ev.target.value = ""; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    if (!d.store || typeof d.store !== "object") throw new Error("bad");
+    let n = 0;
+    for (const [k, v] of Object.entries(d.store))
+      if (v?.word && Array.isArray(v.examples) && (!store[k] || v.examples.length >= store[k].examples.length)) { store[k] = v; n++; }
+    persist(); renderList(); toast(`Đã nhập ${n} từ.`);
+  } catch { toast("File backup không hợp lệ.", true); }
+});
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
 persist();
 renderList();
