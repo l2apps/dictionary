@@ -1,6 +1,6 @@
 {
-  "name": "Dict – Học từ vựng",
-  "short_name": "Dict",
+  "name": "Vulpecula Dictionary",
+  "short_name": "Vulpecula",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
