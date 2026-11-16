@@ -344,7 +344,7 @@ async function lookupWord(raw) {
         mm_translations: mm.translations.slice(1), mm_examples: mm.examples, examples: []
       };
     }
-    if (store[k]) { entry.saved = true; entry.examples = store[k].examples; entry.srs = store[k].srs; store[k] = entry; persist(); renderList(); }
+    if (store[k]) { entry.saved = true; entry.examples = store[k].examples; store[k] = entry; persist(); renderList(); }
     else cachePut(entry);
     views.lookup = mk(entry);
     render("lookup");
@@ -427,7 +427,6 @@ async function handleAction(key, action, target) {
 const avg = (w) => (w.examples.length ? w.examples.reduce((a, x) => a + x.score, 0) / w.examples.length : 99);
 let filter = "all";
 function renderList() {
-  $("#review-count").textContent = dueWords().length;
   $("#notebook-count").textContent = Object.keys(store).length;
   const q = $("#nb-search").value.trim().toLowerCase();
   const items = Object.values(store).filter((w) => {
@@ -452,39 +451,13 @@ function renderList() {
 }
 function showNotebookList() { $("#notebook-view").hidden = true; $("#notebook-list-wrap").hidden = false; renderList(); }
 
-/* ---------- Ôn tập (lặp lại ngắt quãng, 0 token) ---------- */
-const SRS_DAYS = [1, 3, 7, 14, 30];
-const dueWords = () => Object.values(store).filter((w) => !w.srs || w.srs.due <= Date.now());
-let rv = { queue: [], flipped: false, ex: null };
-function pick() {
-  const w = rv.queue[0];
-  rv.flipped = false;
-  rv.ex = w && w.examples.length ? w.examples[Math.floor(Math.random() * w.examples.length)] : null;
-}
-function startReview() { rv.queue = dueWords().sort(() => Math.random() - 0.5); pick(); renderReview(); }
-function renderReview() {
-  const box = $("#review-view"), w = rv.queue[0];
-  if (!w) { box.innerHTML = `<p class="empty">🎉 Không còn từ nào cần ôn lúc này. Quay lại sau nhé!</p>`; return; }
-  const meaning = w.analysis?.vietnamese_meaning || "";
-  const stem = w.word.slice(0, Math.max(3, w.word.length - 3));
-  const blank = rv.ex ? rv.ex.text.replace(new RegExp("\\b" + stem + "\\w*", "ig"), "______") : "";
-  const front = rv.ex
-    ? `<p class="muted">Điền từ còn thiếu (nghĩa: ${esc(meaning)})</p><p class="review-sentence">“${esc(blank)}”</p>`
-    : `<p class="muted">Từ tiếng Anh nào có nghĩa là…</p><p class="review-sentence">${esc(meaning)}</p>`;
-  const back = `<p class="review-sentence">${esc(w.word)} <button class="icon-btn" data-r="speak" aria-label="Phát âm">🔊</button></p>
-    <p class="muted">${esc(w.ipa)} ${esc(w.pos)}</p><p><b>${esc(meaning)}</b></p>${rv.ex ? `<p>“${esc(rv.ex.text)}”</p>` : ""}`;
-  box.innerHTML = `<div class="review-card"><p class="muted">Còn ${rv.queue.length} từ cần ôn</p>${rv.flipped ? back : front}
-    ${rv.flipped
-      ? `<div class="review-actions"><button class="btn btn-ghost" data-r="0">😵 Quên</button><button class="btn btn-ghost" data-r="1">🤔 Khó</button><button class="btn btn-primary" data-r="2">😄 Nhớ</button></div>`
-      : `<div class="review-actions"><button class="btn btn-primary" data-r="flip">Xem đáp án</button></div>`}</div>`;
-}
-function rate(q) {
-  const w = rv.queue.shift(), step = w.srs?.step ?? 0;
-  const ns = q === 0 ? 0 : q === 1 ? step : Math.min(step + 1, SRS_DAYS.length - 1);
-  w.srs = { step: ns, due: Date.now() + (q === 0 ? 10 * 60e3 : SRS_DAYS[ns] * 864e5) };
-  persist(); renderList();
-  if (q === 0) rv.queue.push(w);
-  pick(); renderReview();
+/* ---------- Giao diện sáng / tối ---------- */
+const THEME_KEY = "vulpecula_theme";
+function applyTheme(mode) {
+  const fixed = mode === "light" || mode === "dark";
+  if (fixed) document.documentElement.dataset.theme = mode; else delete document.documentElement.dataset.theme;
+  try { fixed ? localStorage.setItem(THEME_KEY, mode) : localStorage.removeItem(THEME_KEY); } catch {}
+  document.querySelectorAll(".seg-btn").forEach((b) => b.classList.toggle("is-active", b.dataset.mode === (fixed ? mode : "system")));
 }
 
 /* ---------- Settings ---------- */
@@ -496,16 +469,16 @@ document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () 
   $("#tab-lookup").hidden = b.dataset.tab !== "lookup";
   $("#tab-notebook").hidden = b.dataset.tab !== "notebook";
   if (b.dataset.tab === "notebook") { if (!views.notebook) showNotebookList(); }
-  $("#tab-review").hidden = b.dataset.tab !== "review";
-  if (b.dataset.tab === "review") startReview();
 }));
 
 $("#lookup-form").addEventListener("submit", (ev) => { ev.preventDefault(); lookupWord($("#lookup-input").value); });
 $("#settings-btn").addEventListener("click", openSettings);
+document.querySelectorAll(".seg-btn").forEach((b) => b.addEventListener("click", () => applyTheme(b.dataset.mode)));
 $("#settings-form").addEventListener("submit", (ev) => {
   if (ev.submitter?.id === "save-key") {
     const k = $("#api-key-input").value.trim();
     if (k) { localStorage.setItem(API_KEY, k); toast("Đã lưu API Key."); }
+    else if (localStorage.getItem(API_KEY)) { localStorage.removeItem(API_KEY); toast("Đã xoá API Key."); }
   }
 });
 $("#nb-search").addEventListener("input", renderList);
@@ -542,16 +515,9 @@ $("#history").addEventListener("click", (ev) => {
   else if ("clear" in t.dataset) { history = []; saveHistory(); renderHistory(); }
 });
 $("#nb-sort").addEventListener("change", renderList);
-$("#review-view").addEventListener("click", (ev) => {
-  const t = ev.target.closest("[data-r]"); if (!t) return;
-  const a = t.dataset.r;
-  if (a === "flip") { rv.flipped = true; renderReview(); }
-  else if (a === "speak") speak(rv.queue[0]);
-  else rate(Number(a));
-});
 $("#export-btn").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify({ app: "dict", version: 1, store, history }, null, 1)], { type: "application/json" });
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `dict-backup-${today()}.json` });
+  const blob = new Blob([JSON.stringify({ app: "vulpecula", version: 1, store, history }, null, 1)], { type: "application/json" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `vulpecula-backup-${today()}.json` });
   a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 });
 $("#import-btn").addEventListener("click", () => $("#import-file").click());
@@ -568,6 +534,7 @@ $("#import-file").addEventListener("change", async (ev) => {
 });
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 
+applyTheme(localStorage.getItem(THEME_KEY) || "system");
 persist();
 renderList();
 renderUsage();
