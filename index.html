@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Dict – Học từ vựng</title>
+  <title>Vulpecula Dictionary</title>
+  <script>try{var t=localStorage.getItem("vulpecula_theme");if(t==="dark"||t==="light")document.documentElement.dataset.theme=t}catch(e){}</script>
   <link rel="stylesheet" href="style.css">
   <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <meta name="theme-color" content="#16A34A">
 </head>
 <body>
   <header class="app-header">
-    <h1 class="logo">DICT</h1>
+    <h1 class="logo"><img src="icon-192.png" alt="" width="36" height="36"><span>Dictionary</span></h1>
     <nav class="tabs" aria-label="Điều hướng chính">
       <button class="tab is-active" data-tab="lookup">🔍 Tra từ</button>
       <button class="tab" data-tab="notebook">📓 Sổ tay <span id="notebook-count" class="count">0</span></button>
-      <button class="tab" data-tab="review">🃏 Ôn tập <span id="review-count" class="count">0</span></button>
     </nav>
     <span id="usage" class="usage" role="status">⚡ Lượt sử dụng: 0</span>
-    <button id="settings-btn" class="btn btn-ghost" aria-label="Cài đặt API Key">⚙️ <span class="hide-sm">Cài đặt API Key</span></button>
+    <button id="settings-btn" class="btn btn-ghost" aria-label="Cài đặt">⚙️ <span class="hide-sm">Cài đặt</span></button>
   </header>
 
   <main class="app-main">
@@ -50,14 +52,20 @@
       </div>
       <div id="notebook-view" hidden></div>
     </section>
-    <section id="tab-review" class="tab-panel" hidden><div id="review-view"></div></section>
   </main>
 
   <dialog id="settings-dialog">
     <form method="dialog" id="settings-form">
-      <h2>Cài đặt API Key</h2>
-      <p class="muted">Key Groq chỉ lưu trong trình duyệt của bạn (localStorage).</p>
-      <label for="api-key-input">GROQ_API_KEY</label>
+      <h2>Cài đặt</h2>
+      <label>Giao diện</label>
+      <div class="seg" role="group" aria-label="Giao diện">
+        <button type="button" class="seg-btn" data-mode="light">☀️ Sáng</button>
+        <button type="button" class="seg-btn" data-mode="dark">🌙 Tối</button>
+        <button type="button" class="seg-btn" data-mode="system">💻 Hệ thống</button>
+      </div>
+      <hr>
+      <label for="api-key-input">Groq API Key</label>
+      <p class="muted">Key chỉ lưu trong trình duyệt của bạn (localStorage). Để trống rồi bấm Lưu để xoá key.</p>
       <input id="api-key-input" type="password" placeholder="gsk_..." autocomplete="off">
       <hr>
       <label>Sao lưu Sổ tay</label>
@@ -67,7 +75,7 @@
       </div>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
       <div class="dialog-actions">
-        <button class="btn btn-ghost" value="cancel">Huỷ</button>
+        <button class="btn btn-ghost" value="cancel">Đóng</button>
         <button class="btn btn-primary" id="save-key" value="default">Lưu</button>
       </div>
     </form>
